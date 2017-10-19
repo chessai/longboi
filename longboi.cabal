@@ -7,7 +7,7 @@ cabal-version:             >= 1.10
 category:                  Data
 author:                    Daniel Cartwright
 maintainer:                dcartwright@layer3com.com
-license:                   Apache-2.0
+license:                   MIT
 license-file:              LICENSE
 homepage:                  https://github.com/chessai/longboi
 bug-reports:               https://github.com/chessai/longboi/issues
