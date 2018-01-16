@@ -1,126 +1,159 @@
 {-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE GADTs                #-}
+{-# LANGUAGE NoImplicitPrelude    #-}
 {-# LANGUAGE RankNTypes           #-}
+{-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE StandaloneDeriving   #-}
 {-# LANGUAGE TypeFamilies         #-}
+{-# LANGUAGE TypeInType           #-}
 {-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module Longboi 
-  ( Longboi(..)
-  , toList
-  , fromList
-  , head
-  , tail
-  , append
-  , map
-  , uncons
-  , init
-  , last
-  , zipWith
-  , zipWithSame
-  , null
-  ) where
+module Longboi where 
 
-import Control.Applicative ((<$>))
-import Data.Maybe
-import Data.Monoid
-import Prelude ( Bool(..) )
-import Prelude ( Eq (..), Ord (..), Show(..) )
-import Prelude ( ($), (.), (||) )
-import qualified Prelude as P
+import Data.Kind
+import qualified Prelude
+import Prelude (Bool(..))
 
-data Nat = Z | S Nat deriving (Show)
+data Nat = Z | S Nat
 
-infixl 6 :+
-infixl 7 :*
-infixl 9 :~
+infixl 6 +,-
+--infixl 7 *
 
-type family   (n :: Nat) :+ (m :: Nat) :: Nat where
-  Z     :+ m = m
-  (S n) :+ m = S (n :+ m)
+type family (n :: Nat) + (m :: Nat) :: Nat where
+  Z + m = m
+  (S n) + m = S (n + m)
 
-type family   (n :: Nat) :* (m :: Nat) :: Nat where
-  Z     :* m = Z
-  (S n) :* m = (n :* m) :+ m
+--type family (n :: Nat) * (m :: Nat) :: Nat where
+--  Z * m = Z
+--  (S n) * m = (n * m) + m
 
-type family   (n :: Nat) :~ (m :: Nat) :: Nat where
-  Z :~ Z         = Z
-  Z :~ (S _)     = Z
-  (S _) :~ Z     = Z
-  (S m) :~ (S n) = S (m :~ n)
+type family (n :: Nat) - (m :: Nat) :: Nat where
+  Z - m = Z
+  (S n) - Z = S n
+  (S n) - m = S (n - m)
 
-data SNat n where
-  SZ :: SNat Z
-  SS :: SNat n -> SNat (S n)
+type family Min (n :: Nat) (m :: Nat) :: Nat where
+  Min Z Z = Z
+  Min Z (S m) = Z 
+  Min (S n) Z = Z
+  Min (S n) (S m) = S (Min n m)
 
-data Longboi (a :: *) (n :: Nat) where
-  Nil  :: Longboi a Z
-  (:-) :: a -> Longboi a n -> Longboi a (S n)
-infixr 5 :-
+type family Max (n :: Nat) (m :: Nat) :: Nat where
+  Max Z Z = Z
+  Max Z (S m) = S m 
+  Max (S n) Z = S n
+  Max (S n) (S m) = S (Max n m)
 
-deriving instance Eq a => Eq (Longboi a n)
+data Longboi a (n :: Nat) where
+  Nil :: Longboi a Z
+  Cons :: a -> Longboi a n -> Longboi a (S n)
 
-instance Show a => Show (Longboi a n) where
-  showsPrec d = showsPrec d . toList
+deriving instance Prelude.Eq a => Prelude.Eq (Longboi a n)
 
-append :: Longboi a n -> Longboi a m -> Longboi a (n :+ m)
-append (x :- xs) ys = x :- append xs ys
-append Nil ys       = ys
+type family Length (xs :: Longboi a (n :: Nat)) :: Nat where
+  Length Nil = Z
+  Length (Cons x xs) = (S Z) + Length xs
 
-(++) = append
+type family Contains (xs :: Longboi a (n :: Nat)) (elem :: a) :: Bool where
+  Contains Nil _ = False
+  Contains (Cons x xs) x = True
+  Contains (Cons x xs) y = Contains xs y
+
 infixr 5 ++
+(++) :: Longboi a n -> Longboi a m -> Longboi a (n + m)
+(Cons x xs) ++ ys = Cons x (xs ++ ys)
+Nil         ++ ys = ys
+
+type family Append (xs :: Longboi a (n :: Nat)) (ys :: Longboi a (m :: Nat)) :: Longboi a (n + m) where
+  Append (Cons x xs) ys = Cons x (Append xs ys)
+  Append Nil ys = ys
+
+type family Head (xs :: Longboi a (n :: Nat)) :: a where
+  Head (Cons x _) = x
+
+type family Last (xs :: Longboi a (n :: Nat)) :: a where
+  Last (Cons x Nil) = x
+  Last (Cons x xs)  = Last xs
+
+type family Tail (xs :: Longboi a ((S n) :: Nat)) :: Longboi a (n :: Nat) where
+  Tail (Cons _ xs) = xs
+
+type family Init (xs :: Longboi a ((S n) :: Nat)) :: Longboi a (n :: Nat) where
+  Init (Cons _ Nil) = Nil
+  Init (Cons x xs ) = Cons x (Init xs)
+
+type family Null (xs :: Longboi a (n :: Nat)) :: Bool where
+  Null Nil = True
+  Null _   = False
+
+type family VMap (f :: a -> b) (xs :: Longboi a (n :: Nat)) :: Longboi b (n :: Nat) where
+  VMap _ Nil = Nil
+  VMap f (Cons x xs) = Cons (f x) (VMap f xs)
+
+type family Foldl (f :: a -> b -> a) (x :: a) (ys :: Longboi b (n :: Nat)) :: a where
+  Foldl _ x Nil = x
+  Foldl f y (Cons x xs) = Foldl f (f y x) xs
+
+type family Foldr (f :: a -> b -> b) (x :: b) (ys :: Longboi a (n :: Nat)) :: b where
+  Foldr _ y Nil = y
+  Foldr f y (Cons x xs) = f x (Foldr f y xs)
+
+type family ZipWithSame (f :: a -> b -> c) (xs :: Longboi a (n :: Nat)) (ys :: Longboi a (n :: Nat)) :: Longboi c (n :: Nat) where
+  ZipWithSame _ Nil Nil = Nil
+  ZipWithSame f (Cons a as) (Cons b bs) = Cons (f a b) (ZipWithSame f as bs)
+
+type family ZipWith (f :: a -> b -> c) (xs :: Longboi a (n :: Nat)) (ys :: Longboi a (m :: Nat)) :: Longboi c (Min n m) where
+  ZipWith _ Nil Nil = Nil
+  ZipWith _ Nil (Cons _ _) = Nil
+  ZipWith _ (Cons _ _) Nil = Nil
+  ZipWith f (Cons a as) (Cons b bs) = Cons (f a b) (ZipWith f as bs)
 
 head :: Longboi a (S n) -> a
-head (x :- _) = x
+head (Cons x _) = x
 
 last :: Longboi a n -> a
-last (x :- Nil) = x
-last (x :- xs)  = last xs
+last (Cons x Nil) = x
+last (Cons x xs)  = last xs
 
 tail :: Longboi a (S n) -> Longboi a n
-tail (_ :- xs) = xs
+tail (Cons _ xs) = xs
 
 init :: Longboi a (S n) -> Longboi a n
-init (x :- xs) = 
+init (Cons x xs) =
   case xs of
-    Nil      -> Nil
-    (_ :- _) -> x :- init xs
+    Nil -> Nil
+    (Cons _ _) -> Cons x (init xs)
 
 uncons :: Longboi a (S n) -> (a, Longboi a n)
-uncons (x :- xs) = (x, xs)
+uncons (Cons x xs) = (x, xs)
 
 null :: Longboi a n -> Bool
 null Nil = True
 null _   = False
 
-map :: (a -> b) -> Longboi a n -> Longboi b n
-map _ Nil       = Nil
-map f (x :- xs) = f x :- map f xs
+vmap :: (a -> b) -> Longboi a n -> Longboi b n
+vmap _ Nil = Nil
+vmap f (Cons x xs) = Cons (f x) (vmap f xs)
 
 foldl :: (a -> b -> a) -> a -> Longboi b n -> a
-foldl _ x Nil       = x
-foldl f y (x :- xs) = foldl f (f y x) xs
+foldl _ x Nil = x
+foldl f y (Cons x xs) = foldl f (f y x) xs
 
 foldr :: (a -> b -> b) -> b -> Longboi a n -> b
 foldr _ y Nil = y
-foldr f y (x :- xs) = f x (foldr f y xs)
+foldr f y (Cons x xs) = f x (foldr f y xs)
 
 toList :: Longboi a n -> [a]
-toList Nil       = []
-toList (x :- xs) = x : toList xs
-
-fromList :: forall (n :: Nat) a. SNat n -> [a] -> Maybe (Longboi a n)
-fromList SZ _            = Just Nil
-fromList (SS n) (x : xs) = (x :-) <$> fromList n xs
-fromList (SS n) []       = Nothing
+toList Nil = []
+toList (Cons x xs) = x : toList xs
 
 zipWithSame :: (a -> b -> c) -> Longboi a n -> Longboi b n -> Longboi c n
-zipWithSame _ Nil Nil             = Nil
-zipWithSame f (a :- as) (b :- bs) = f a b :- zipWithSame f as bs
+zipWithSame _ Nil Nil = Nil
+zipWithSame f (Cons a as) (Cons b bs) = Cons (f a b) (zipWithSame f as bs)
 
-zipWith :: (a -> b -> c) -> Longboi a n -> Longboi b m -> Longboi c (n :~ m)
-zipWith _ Nil Nil             = Nil
-zipWith _ Nil (_ :- _)        = Nil
-zipWith _ (_ :- _)   Nil      = Nil
-zipWith f (a :- as) (b :- bs) = f a b :- zipWith f as bs
+zipWith :: (a -> b -> c) -> Longboi a n -> Longboi b m -> Longboi c (Min n m)
+zipWith _ Nil Nil = Nil
+zipWith _ Nil (Cons _ _) = Nil
+zipWith _ (Cons _ _) Nil = Nil
+zipWith f (Cons a as) (Cons b bs) = Cons (f a b) (zipWith f as bs)
