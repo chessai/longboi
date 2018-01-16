@@ -11,22 +11,22 @@
 
 module Longboi where 
 
-import Data.Kind
 import qualified Prelude
 import Prelude (Bool(..))
 
 data Nat = Z | S Nat
+  deriving (Prelude.Eq, Prelude.Show)
 
 infixl 6 +,-
---infixl 7 *
+infixl 7 *
 
 type family (n :: Nat) + (m :: Nat) :: Nat where
   Z + m = m
   (S n) + m = S (n + m)
 
---type family (n :: Nat) * (m :: Nat) :: Nat where
---  Z * m = Z
---  (S n) * m = (n * m) + m
+type family (n :: Nat) * (m :: Nat) :: Nat where
+  Z * m = Z
+  (S n) * m = (n * m) + m
 
 type family (n :: Nat) - (m :: Nat) :: Nat where
   Z - m = Z
