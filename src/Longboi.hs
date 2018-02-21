@@ -136,6 +136,20 @@ vmap :: (a -> b) -> Longboi a n -> Longboi b n
 vmap _ Nil = Nil
 vmap f (Cons x xs) = Cons (f x) (vmap f xs)
 
+data SNat n where
+  SZ :: SNat Z
+  SS :: SNat n -> SNat (S n)
+
+infixl 6 :+
+infixl 7 :*
+
+(:+) :: SNat n -> SNat m -> SNat (n + m)
+SZ   :+ m = m
+SS n :+ m = SS (n :+ m)
+
+(:*) :: SNat n -> SNat m -> SNat (n * m)
+SZ   :* m = SZ
+SS n :* m = SS 
 foldl :: (a -> b -> a) -> a -> Longboi b n -> a
 foldl _ x Nil = x
 foldl f y (Cons x xs) = foldl f (f y x) xs
